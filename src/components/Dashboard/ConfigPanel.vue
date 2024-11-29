@@ -40,13 +40,19 @@
                         <span class="label-text">Max Temperature (°C)</span>
                     </label>
                     <input type="number" v-model="config.safetySettings.maxTemp" class="input input-bordered w-full"
-                        placeholder="Enter max temperature" />
+                        placeholder="Enter max temperature" :disabled="!config.safetySettings.tempStop" />
 
                     <label class="label cursor-pointer mt-2">
                         <span class="label-text">Vibration Alert</span>
                         <input type="checkbox" v-model="config.safetySettings.vibrationAlert"
                             class="toggle toggle-warning" />
                     </label>
+
+                    <label class="label mt-2">
+                        <span class="label-text">Max Tension (kPa)</span>
+                    </label>
+                    <input type="number" v-model="config.safetySettings.maxTension" class="input input-bordered w-full"
+                        placeholder="Enter max blade tension" />
                 </div>
 
                 <!-- Maintenance Schedule -->
@@ -64,47 +70,32 @@
                     </label>
                     <input type="date" v-model="config.maintenance.nextDate" class="input input-bordered w-full" />
                 </div>
-
-                <!-- Notifications -->
-                <div class="form-control">
-                    <h3 class="text-lg font-semibold mb-4">Notifications</h3>
-
-                    <label class="label cursor-pointer">
-                        <span class="label-text">Email Alerts</span>
-                        <input type="checkbox" v-model="config.notifications.email" class="toggle toggle-primary" />
-                    </label>
-
-                    <label class="label cursor-pointer mt-2">
-                        <span class="label-text">SMS Alerts</span>
-                        <input type="checkbox" v-model="config.notifications.sms" class="toggle toggle-primary" />
-                    </label>
-
-                    <label class="label mt-2">
-                        <span class="label-text">Alert Email Address</span>
-                    </label>
-                    <input type="email" v-model="config.notifications.emailAddress" class="input input-bordered w-full"
-                        placeholder="Enter email" />
-                </div>
             </div>
 
+            <!-- Action Buttons -->
             <div class="flex justify-end gap-2 mt-6">
-                <button class="btn btn-ghost" @click="resetConfig">Reset</button>
-                <button class="btn btn-primary" @click="saveConfig">Save Changes</button>
+                <button class="btn btn-ghost" @click="resetConfig" :disabled="saving">
+                    Reset
+                </button>
+                <button class="btn btn-primary" @click="saveConfig" :disabled="saving">
+                    <span class="loading loading-spinner" v-if="saving"></span>
+                    Save Changes
+                </button>
             </div>
         </div>
     </div>
 </template>
 
 <script>
+import { defineComponent } from 'vue'
 import { mapActions, mapGetters } from 'vuex'
 
-export default {
+export default defineComponent({
     name: 'ConfigPanel',
-    computed: {
-        ...mapGetters(['currentConfig'])
-    },
+
     data() {
         return {
+            saving: false,
             config: {
                 bladeSpeed: 1000,
                 feedRate: 500,
@@ -112,33 +103,41 @@ export default {
                 safetySettings: {
                     tempStop: true,
                     maxTemp: 80,
-                    vibrationAlert: true
+                    vibrationAlert: true,
+                    maxTension: 45000 // 45 kPa
                 },
                 maintenance: {
                     bladeInterval: 168,
                     nextDate: new Date().toISOString().split('T')[0]
-                },
-                notifications: {
-                    email: true,
-                    sms: false,
-                    emailAddress: ''
                 }
             }
         }
     },
+
+    computed: {
+        ...mapGetters('machine', ['currentConfig']),
+    },
+
     methods: {
         ...mapActions(['saveConfig', 'loadConfig']),
 
         async handleSaveConfig() {
+            this.saving = true
             try {
-                const success = await this.saveConfig(this.config)
-                if (success) {
-                    // Mostra notifica di successo
-                    console.log('Configuration saved successfully')
-                }
+                await this.saveConfig(this.config)
+                // Mostra toast di successo usando il sistema di alert centralizzato
+                this.$store.dispatch('machine/setAlert', {
+                    message: 'Configuration saved successfully',
+                    type: 'success'
+                })
             } catch (error) {
-                console.error('Error saving configuration:', error)
-                // Mostra notifica di errore
+                // Mostra toast di errore usando il sistema di alert centralizzato
+                this.$store.dispatch('machine/setAlert', {
+                    message: 'Error saving configuration',
+                    type: 'error'
+                })
+            } finally {
+                this.saving = false
             }
         },
 
@@ -147,6 +146,7 @@ export default {
             this.config = { ...this.currentConfig }
         }
     },
+
     async created() {
         if (this.currentConfig) {
             this.config = { ...this.currentConfig }
@@ -154,5 +154,5 @@ export default {
             await this.loadConfig()
         }
     }
-}
+})
 </script>

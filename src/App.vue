@@ -5,14 +5,15 @@
 </template>
 
 <script>
-import DashboardView from '@/views/DashboardView.vue'
+import { defineComponent } from 'vue';
+import DashboardView from '@/views/DashboardView.vue';
 
-export default {
+export default defineComponent({
   name: 'App',
   components: {
-    DashboardView
-  }
-}
+    DashboardView,
+  },
+});
 </script>
 
 <style>

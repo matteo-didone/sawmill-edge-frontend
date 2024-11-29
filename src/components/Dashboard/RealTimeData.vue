@@ -1,120 +1,119 @@
 <template>
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h2 class="card-title flex justify-between">
-                Real-Time Monitoring
-                <span class="text-sm font-normal">Last update: {{ lastUpdate }}</span>
-            </h2>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="card-title">Real-Time Monitoring</h2>
+                <span class="text-sm text-gray-500">Last update: {{ formattedLastUpdate }}</span>
+            </div>
 
+            <!-- Grid di metriche -->
             <div class="grid grid-cols-2 gap-4">
+                <!-- Temperatura -->
                 <div class="stat bg-base-200 rounded-box">
-                    <div class="stat-title">Temperature</div>
+                    <div class="stat-title flex items-center gap-2">
+                        Temperature
+                        <span v-if="isTemperatureCritical" class="badge badge-sm badge-error">Critical</span>
+                    </div>
                     <div class="stat-value" :class="{
-                        'text-error': machineData.temperature > currentConfig?.safetySettings?.maxTemp,
-                        'text-primary': machineData.temperature <= currentConfig?.safetySettings?.maxTemp
+                        'text-error': isTemperatureCritical,
+                        'text-primary': !isTemperatureCritical
                     }">
-                        {{ machineData.temperature.toFixed(1) }}°C
+                        {{ formattedData.temperature }}
                     </div>
                 </div>
 
+                <!-- Tensione Lama -->
                 <div class="stat bg-base-200 rounded-box">
-                    <div class="stat-title">Pressure</div>
+                    <div class="stat-title flex items-center gap-2">
+                        Blade Tension
+                        <span v-if="!isBladeTensionSafe" class="badge badge-sm badge-warning">Warning</span>
+                    </div>
                     <div class="stat-value text-secondary">
-                        {{ machineData.pressure.toFixed(1) }} Bar
+                        {{ formattedData.bladeTension }}
                     </div>
                 </div>
 
+                <!-- Vibrazione -->
                 <div class="stat bg-base-200 rounded-box">
-                    <div class="stat-title">Vibration</div>
+                    <div class="stat-title flex items-center gap-2">
+                        Vibration
+                        <span v-if="isVibrationHigh" class="badge badge-sm badge-warning">High</span>
+                    </div>
                     <div class="stat-value" :class="{
-                        'text-warning': machineData.vibration > 80,
-                        'text-success': machineData.vibration <= 80
+                        'text-warning': isVibrationHigh,
+                        'text-success': !isVibrationHigh
                     }">
-                        {{ machineData.vibration.toFixed(1) }} Hz
+                        {{ formattedData.vibration }}
                     </div>
                 </div>
 
+                <!-- Consumo Energia -->
                 <div class="stat bg-base-200 rounded-box">
                     <div class="stat-title">Power Usage</div>
                     <div class="stat-value text-accent">
-                        {{ machineData.powerUsage.toFixed(1) }} kW
+                        {{ formattedData.powerUsage }}
                     </div>
                 </div>
             </div>
 
-            <div class="alert alert-warning mt-4" v-if="currentWarnings.length > 0">
+            <!-- Status dello Stream Dati -->
+            <div class="mt-4 flex items-center gap-2">
+                <div class="badge" :class="isDataStreaming ? 'badge-success' : 'badge-error'">
+                    Data Stream: {{ isDataStreaming ? 'Active' : 'Inactive' }}
+                </div>
+                <button v-if="!isDataStreaming" class="btn btn-sm btn-outline" @click="startMonitoring">
+                    Reconnect
+                </button>
+            </div>
+
+            <!-- Alerts -->
+            <div v-if="thresholdAlerts.length" class="alert alert-warning mt-4">
                 <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
                     viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <span>{{ currentWarnings[0] }}</span>
-            </div>
-
-            <div class="mt-4">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm">Data Stream:</span>
-                    <span class="badge" :class="isConnected ? 'badge-success' : 'badge-error'">
-                        {{ isConnected ? 'Active' : 'Disconnected' }}
-                    </span>
-                </div>
+                <span>{{ thresholdAlerts[0] }}</span>
             </div>
         </div>
     </div>
 </template>
 
 <script>
-import { mapState, mapGetters } from 'vuex'
-import { mqttService } from '@/services/mqttService'
+import { defineComponent } from 'vue'
+import { mapState, mapGetters, mapActions } from 'vuex'
 
-export default {
+export default defineComponent({
     name: 'RealTimeData',
-    data() {
-        return {
-            lastUpdate: 'Never'
-        }
-    },
+
     computed: {
-        ...mapState(['machineData']),
-        ...mapGetters(['isConnected', 'currentWarnings', 'currentConfig'])
+        ...mapState('monitoring', [
+            'isDataStreaming',
+            'thresholdAlerts'
+        ]),
+
+        ...mapGetters('monitoring', [
+            'formattedData',
+            'isTemperatureCritical',
+            'isVibrationHigh',
+            'isBladeTensionSafe',
+            'formattedLastUpdate'
+        ])
     },
+
     methods: {
-        updateLastUpdate() {
-            this.lastUpdate = new Date().toLocaleTimeString()
-        },
-
-        setupMQTTSubscriptions() {
-            // Subscribe to machine data topics
-            mqttService.addSubscriber('sawmill/temperature', (data) => {
-                this.$store.commit('SET_MACHINE_DATA', { temperature: data })
-                this.updateLastUpdate()
-            })
-
-            mqttService.addSubscriber('sawmill/pressure', (data) => {
-                this.$store.commit('SET_MACHINE_DATA', { pressure: data })
-                this.updateLastUpdate()
-            })
-
-            mqttService.addSubscriber('sawmill/vibration', (data) => {
-                this.$store.commit('SET_MACHINE_DATA', { vibration: data })
-                this.updateLastUpdate()
-            })
-
-            mqttService.addSubscriber('sawmill/power', (data) => {
-                this.$store.commit('SET_MACHINE_DATA', { powerUsage: data })
-                this.updateLastUpdate()
-            })
-        }
+        ...mapActions('monitoring', [
+            'startMonitoring',
+            'stopMonitoring'
+        ])
     },
+
     mounted() {
-        this.setupMQTTSubscriptions()
+        this.startMonitoring()
     },
+
     beforeUnmount() {
-        // Cleanup MQTT subscriptions
-        mqttService.removeSubscriber('sawmill/temperature')
-        mqttService.removeSubscriber('sawmill/pressure')
-        mqttService.removeSubscriber('sawmill/vibration')
-        mqttService.removeSubscriber('sawmill/power')
+        this.stopMonitoring()
     }
-}
+})
 </script>

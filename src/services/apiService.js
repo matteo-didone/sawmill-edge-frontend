@@ -1,69 +1,74 @@
-// src/services/apiService.js
+import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api'; // Cambia con il tuo URL backend
+const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || 'http://localhost:3000/api';
 
-export const apiService = {
-    // Configurazione
+class APIService {
+    constructor() {
+        this.axios = axios.create({
+            baseURL: API_BASE_URL,
+            timeout: 5000,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    }
+
     async getConfig() {
         try {
-            const response = await fetch(`${API_BASE_URL}/config`);
-            return await response.json();
+            const response = await this.axios.get('/config');
+            return response.data;
         } catch (error) {
             console.error('Error fetching config:', error);
             throw error;
         }
-    },
+    }
 
     async updateConfig(config) {
         try {
-            const response = await fetch(`${API_BASE_URL}/config`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(config)
-            });
-            return await response.json();
+            const response = await this.axios.put('/config', config);
+            return response.data;
         } catch (error) {
             console.error('Error updating config:', error);
             throw error;
         }
-    },
+    }
 
-    // Controllo macchina
     async startMachine() {
         try {
-            const response = await fetch(`${API_BASE_URL}/machine/start`, { method: 'POST' });
-            return await response.json();
+            await this.axios.post('/machine/start');
         } catch (error) {
             console.error('Error starting machine:', error);
             throw error;
         }
-    },
+    }
 
     async stopMachine() {
         try {
-            const response = await fetch(`${API_BASE_URL}/machine/stop`, { method: 'POST' });
-            return await response.json();
+            await this.axios.post('/machine/stop');
         } catch (error) {
             console.error('Error stopping machine:', error);
             throw error;
         }
-    },
+    }
 
     async updateSpeed(speed) {
         try {
-            const response = await fetch(`${API_BASE_URL}/machine/speed`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ speed })
-            });
-            return await response.json();
+            await this.axios.post('/machine/speed', { speed });
         } catch (error) {
             console.error('Error updating speed:', error);
             throw error;
         }
     }
-};
+
+    async getHealthStatus() {
+        try {
+            const response = await this.axios.get('/machine/health');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching health status:', error);
+            throw error;
+        }
+    }
+}
+
+export const apiService = new APIService();
