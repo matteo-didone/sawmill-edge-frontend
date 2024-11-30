@@ -2,6 +2,24 @@ const path = require('path');
 
 module.exports = {
   transpileDependencies: ['mqtt'], // Supporto per il pacchetto MQTT
+
+  // Aggiungi la configurazione del dev server
+  devServer: {
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        ws: true,
+        pathRewrite: {
+          '^/api': '/api/v1'
+        },
+        onProxyReq: (proxyReq, req, res) => {
+          console.log('Proxying request to:', proxyReq.path);
+        }
+      }
+    }    
+  },
+
   configureWebpack: {
     resolve: {
       alias: {

@@ -22,28 +22,11 @@
                     </div>
                 </div>
 
-                <!-- Tensione Lama -->
+                <!-- Velocità di taglio -->
                 <div class="stat bg-base-200 rounded-box">
-                    <div class="stat-title flex items-center gap-2">
-                        Blade Tension
-                        <span v-if="!isBladeTensionSafe" class="badge badge-sm badge-warning">Warning</span>
-                    </div>
+                    <div class="stat-title">Cutting Speed</div>
                     <div class="stat-value text-secondary">
-                        {{ formattedData.bladeTension }}
-                    </div>
-                </div>
-
-                <!-- Vibrazione -->
-                <div class="stat bg-base-200 rounded-box">
-                    <div class="stat-title flex items-center gap-2">
-                        Vibration
-                        <span v-if="isVibrationHigh" class="badge badge-sm badge-warning">High</span>
-                    </div>
-                    <div class="stat-value" :class="{
-                        'text-warning': isVibrationHigh,
-                        'text-success': !isVibrationHigh
-                    }">
-                        {{ formattedData.vibration }}
+                        {{ formattedData.cuttingSpeed }} m/min
                     </div>
                 </div>
 
@@ -51,7 +34,15 @@
                 <div class="stat bg-base-200 rounded-box">
                     <div class="stat-title">Power Usage</div>
                     <div class="stat-value text-accent">
-                        {{ formattedData.powerUsage }}
+                        {{ formattedData.powerUsage }} kW
+                    </div>
+                </div>
+
+                <!-- Pezzi tagliati -->
+                <div class="stat bg-base-200 rounded-box">
+                    <div class="stat-title">Cut Pieces</div>
+                    <div class="stat-value text-success">
+                        {{ sensorData.pieces_count || 0 }}
                     </div>
                 </div>
             </div>
@@ -66,14 +57,14 @@
                 </button>
             </div>
 
-            <!-- Alerts -->
-            <div v-if="thresholdAlerts.length" class="alert alert-warning mt-4">
+            <!-- Error Alert -->
+            <div v-if="error" class="alert alert-error mt-4">
                 <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
                     viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <span>{{ thresholdAlerts[0] }}</span>
+                <span>{{ error }}</span>
             </div>
         </div>
     </div>
@@ -86,17 +77,22 @@ import { mapState, mapGetters, mapActions } from 'vuex'
 export default defineComponent({
     name: 'RealTimeData',
 
+    data() {
+        return {
+            error: null,
+            sensorData: {},
+            updateInterval: null
+        }
+    },
+
     computed: {
         ...mapState('monitoring', [
             'isDataStreaming',
-            'thresholdAlerts'
+            'lastUpdate'
         ]),
 
         ...mapGetters('monitoring', [
             'formattedData',
-            'isTemperatureCritical',
-            'isVibrationHigh',
-            'isBladeTensionSafe',
             'formattedLastUpdate'
         ])
     },
@@ -105,15 +101,43 @@ export default defineComponent({
         ...mapActions('monitoring', [
             'startMonitoring',
             'stopMonitoring'
-        ])
+        ]),
+
+        async fetchMachineStatus() {
+            try {
+                const response = await this.$store.dispatch('monitoring/fetchMachineStatus');
+                this.sensorData = response;
+                this.error = null;
+            } catch (error) {
+                console.error('Error fetching machine status:', error);
+                this.error = 'Failed to fetch machine status';
+            }
+        },
+
+        startPolling() {
+            this.updateInterval = setInterval(() => {
+                if (this.isDataStreaming) {
+                    this.fetchMachineStatus();
+                }
+            }, 1000); // Poll every second
+        },
+
+        stopPolling() {
+            if (this.updateInterval) {
+                clearInterval(this.updateInterval);
+                this.updateInterval = null;
+            }
+        }
     },
 
     mounted() {
-        this.startMonitoring()
+        this.startMonitoring();
+        this.startPolling();
     },
 
     beforeUnmount() {
-        this.stopMonitoring()
+        this.stopMonitoring();
+        this.stopPolling();
     }
 })
 </script>

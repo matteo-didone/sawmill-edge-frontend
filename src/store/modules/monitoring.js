@@ -1,112 +1,78 @@
 // store/modules/monitoring.js
+import { apiService } from '@/services/apiService';
+
 export default {
     namespaced: true,
     state: {
-        data: {
-            temperature: 0,
-            bladeTension: 0,
-            vibration: 0,
-            powerUsage: 0
-        },
         isDataStreaming: false,
+        data: {
+            cutting_speed: 0,
+            power_consumption: 0,
+            pieces_count: 0
+        },
+        historicalData: [],
         lastUpdate: null,
-        thresholdAlerts: [],
-        thresholds: {
-            temperature: { critical: 85, warning: 75 },
-            bladeTension: { min: 1200, max: 1800 },
-            vibration: { warning: 0.75 },
-            powerUsage: { warning: 90 }
-        }
+        error: null
     },
-
     mutations: {
+        SET_DATA_STREAMING(state, status) {
+            state.isDataStreaming = status;
+        },
         SET_SENSOR_DATA(state, data) {
             state.data = { ...state.data, ...data };
             state.lastUpdate = new Date();
         },
-        SET_DATA_STREAMING(state, status) {
-            state.isDataStreaming = status;
+        SET_HISTORICAL_DATA(state, data) {
+            state.historicalData = data;
         },
-        ADD_THRESHOLD_ALERT(state, alert) {
-            if (!state.thresholdAlerts.includes(alert)) {
-                state.thresholdAlerts.push(alert);
-            }
-        },
-        CLEAR_THRESHOLD_ALERTS(state) {
-            state.thresholdAlerts = [];
+        SET_ERROR(state, error) {
+            state.error = error;
         }
     },
-
     getters: {
-        formattedData: (state) => ({
-            temperature: `${state.data.temperature.toFixed(1)}°C`,
-            bladeTension: `${state.data.bladeTension.toFixed(0)} kPa`,
-            vibration: `${state.data.vibration.toFixed(2)} g`,
-            powerUsage: `${state.data.powerUsage.toFixed(1)} kW`
+        formattedData: state => ({
+            cuttingSpeed: state.data.cutting_speed ? state.data.cutting_speed.toFixed(1) : '0.0',
+            powerUsage: state.data.power_consumption ? state.data.power_consumption.toFixed(1) : '0.0',
+            piecesCount: state.data.pieces_count || 0
         }),
-
-        isTemperatureCritical: (state) =>
-            state.data.temperature >= state.thresholds.temperature.critical,
-
-        isVibrationHigh: (state) =>
-            state.data.vibration >= state.thresholds.vibration.warning,
-
-        isBladeTensionSafe: (state) =>
-            state.data.bladeTension >= state.thresholds.bladeTension.min &&
-            state.data.bladeTension <= state.thresholds.bladeTension.max,
-
-        formattedLastUpdate: (state) => {
+        formattedLastUpdate: state => {
             if (!state.lastUpdate) return 'No data';
             return new Intl.DateTimeFormat('default', {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit'
             }).format(state.lastUpdate);
-        }
-    },
-
-    actions: {
-        startMonitoring({ commit, dispatch }) {
-            commit('SET_DATA_STREAMING', true);
-            dispatch('simulateDataStream');
         },
-
+        getHistoricalData: state => state.historicalData
+    },
+    actions: {
+        async startMonitoring({ commit }) {
+            commit('SET_DATA_STREAMING', true);
+        },
         stopMonitoring({ commit }) {
             commit('SET_DATA_STREAMING', false);
         },
-
-        updateSensorData({ commit, state }, data) {
-            commit('SET_SENSOR_DATA', data);
-
-            // Check thresholds and set alerts
-            if (data.temperature >= state.thresholds.temperature.critical) {
-                commit('ADD_THRESHOLD_ALERT', 'Critical temperature detected!');
-            }
-
-            if (!state.isBladeTensionSafe) {
-                commit('ADD_THRESHOLD_ALERT', 'Blade tension out of safe range');
-            }
-
-            if (data.vibration >= state.thresholds.vibration.warning) {
-                commit('ADD_THRESHOLD_ALERT', 'High vibration detected');
+        async fetchMachineStatus({ commit }) {
+            try {
+                const response = await apiService.getMachineStatus();
+                commit('SET_SENSOR_DATA', response);
+                commit('SET_ERROR', null);
+                return response;
+            } catch (error) {
+                commit('SET_ERROR', error.message);
+                commit('SET_DATA_STREAMING', false);
+                throw error;
             }
         },
-
-        simulateDataStream({ dispatch, state }) {
-            if (!state.isDataStreaming) return;
-
-            const randomData = {
-                temperature: 70 + Math.random() * 20,
-                bladeTension: 1500 + Math.random() * 400 - 200,
-                vibration: Math.random(),
-                powerUsage: 50 + Math.random() * 50
-            };
-
-            dispatch('updateSensorData', randomData);
-
-            setTimeout(() => {
-                dispatch('simulateDataStream');
-            }, 1000);
+        async getHistoricalData({ commit }) {
+            try {
+                const response = await apiService.getMetrics();
+                commit('SET_HISTORICAL_DATA', response);
+                return response;
+            } catch (error) {
+                commit('SET_ERROR', error.message);
+                throw error;
+            }
         }
     }
 };

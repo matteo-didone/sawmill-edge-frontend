@@ -13,12 +13,28 @@
 
         <!-- Main Grid Layout -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Control and Real-time Data Section -->
             <div class="col-span-1">
                 <ControlPanel />
             </div>
             <div class="col-span-1">
                 <RealTimeData />
             </div>
+
+            <!-- Diagnostics and Alerts Section -->
+            <div class="col-span-1">
+                <DiagnosticsPanel />
+            </div>
+            <div class="col-span-1">
+                <AlertsHistory />
+            </div>
+
+            <!-- Time Series Charts Section -->
+            <div class="col-span-1 lg:col-span-2">
+                <TimeSeriesCharts />
+            </div>
+
+            <!-- Configuration Section -->
             <div class="col-span-1 lg:col-span-2">
                 <ConfigPanel />
             </div>
@@ -32,6 +48,9 @@ import { mapState } from 'vuex';
 import ControlPanel from '@/components/Dashboard/ControlPanel.vue';
 import RealTimeData from '@/components/Dashboard/RealTimeData.vue';
 import ConfigPanel from '@/components/Dashboard/ConfigPanel.vue';
+import DiagnosticsPanel from '@/components/Dashboard/DiagnosticsPanel.vue';
+import AlertsHistory from '@/components/Dashboard/AlertsHistory.vue';
+import TimeSeriesCharts from '@/components/Dashboard/TimeSeriesCharts.vue';
 
 export default defineComponent({
     name: 'DashboardView',
@@ -39,6 +58,9 @@ export default defineComponent({
         ControlPanel,
         RealTimeData,
         ConfigPanel,
+        DiagnosticsPanel,
+        AlertsHistory,
+        TimeSeriesCharts,
     },
     computed: {
         ...mapState({
