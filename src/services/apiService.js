@@ -1,7 +1,6 @@
-// services/apiService.js
 import axios from 'axios';
 
-const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 class APIService {
     constructor() {
@@ -9,17 +8,31 @@ class APIService {
             baseURL: API_BASE_URL,
             timeout: 5000,
             headers: {
-                'Content-Type': 'application/json'
-            }
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            withCredentials: false  // Cambiato a false per evitare problemi CORS con credenziali
         });
 
+        // Interceptor per il logging delle richieste
+        this.axios.interceptors.request.use(
+            config => {
+                console.log('Making request to:', config.url);
+                return config;
+            },
+            error => {
+                console.error('Request error:', error);
+                return Promise.reject(error);
+            }
+        );
+
+        // Interceptor per le risposte e gli errori
         this.axios.interceptors.response.use(
             response => response,
             error => this.handleError(error)
         );
     }
 
-    // Machine Status
     async getMachineStatus() {
         try {
             const response = await this.axios.get('/status');
@@ -30,7 +43,6 @@ class APIService {
         }
     }
 
-    // Command Execution
     async executeCommand(command, params = {}) {
         try {
             const response = await this.axios.post('/command', {
@@ -44,7 +56,6 @@ class APIService {
         }
     }
 
-    // Alarms and Alerts
     async getAlarms() {
         try {
             const response = await this.axios.get('/alarms');
@@ -65,7 +76,6 @@ class APIService {
         }
     }
 
-    // Metrics and Diagnostics
     async getMetrics() {
         try {
             const response = await this.axios.get('/metrics');
@@ -107,7 +117,6 @@ class APIService {
         }
     }
 
-    // Configuration
     async getConfig() {
         try {
             const response = await this.axios.get('/config');
@@ -118,7 +127,21 @@ class APIService {
         }
     }
 
-    // System Health and Maintenance
+    async saveConfig(config) {
+        try {
+            console.log("Sending config:", config);
+            const response = await this.axios.post('/config', config, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error("Error saving config:", error);
+            throw error;
+        }
+    }
+
     async updateSystemHealth(health) {
         try {
             const response = await this.axios.post('/system/health', { health });
@@ -149,7 +172,6 @@ class APIService {
         }
     }
 
-    // Component Management
     async updateComponentStatus(componentId, status) {
         try {
             const response = await this.axios.post(`/components/${componentId}/status`, { status });
@@ -170,7 +192,6 @@ class APIService {
         }
     }
 
-    // Machine Control
     async startMachine() {
         return this.executeCommand('START');
     }
@@ -183,7 +204,6 @@ class APIService {
         return this.executeCommand('SET_SPEED', { speed });
     }
 
-    // Sensor Management
     async calibrateSensor(sensorId) {
         try {
             const response = await this.axios.post(`/sensors/${sensorId}/calibrate`);
@@ -194,7 +214,6 @@ class APIService {
         }
     }
 
-    // Helper Methods
     _formatSensorsData(sensors) {
         return sensors.map(sensor => ({
             id: sensor.id,
@@ -211,12 +230,25 @@ class APIService {
     handleError(error) {
         if (error.response) {
             console.error('Server Error:', error.response.data);
-            if (error.response.status === 404) {
-                throw {
-                    response: error.response,
-                    message: 'Resource not found'
-                };
+            console.error('Status:', error.response.status);
+            console.error('Headers:', error.response.headers);
+
+            if (error.response.data.detail && Array.isArray(error.response.data.detail)) {
+                const missingFields = error.response.data.detail
+                    .map(err => {
+                        if (err.type === "missing") {
+                            return err.loc?.join('.');
+                        } else if (err.type === "value_error") {
+                            return `${err.loc?.join('.')} (${err.msg})`;
+                        }
+                        return `${err.loc?.join('.')} (${err.type}: ${err.msg})`;
+                    })
+                    .filter(Boolean)
+                    .join(', ');
+
+                throw new Error(`Errore di validazione: ${missingFields}`);
             }
+
             throw new Error(error.response.data.detail || 'Server error occurred');
         } else if (error.request) {
             console.error('Network Error:', error.request);
