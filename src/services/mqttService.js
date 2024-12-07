@@ -106,6 +106,12 @@ class MQTTService {
             throw new Error('MQTT client not connected');
         }
 
+        // Assicuriamoci che i messaggi di comando abbiano sempre il campo command
+        if (topic.includes('/command') && !message.command) {
+            console.error('Invalid command message format');
+            return;
+        }
+
         this.client.publish(`sawmill/${topic}`, JSON.stringify(message));
     }
 

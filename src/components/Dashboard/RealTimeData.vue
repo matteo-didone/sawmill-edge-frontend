@@ -81,7 +81,8 @@ export default defineComponent({
         return {
             error: null,
             sensorData: {},
-            updateInterval: null
+            updateInterval: null,
+            isTemperatureCritical: false,
         }
     },
 
