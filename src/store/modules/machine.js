@@ -63,15 +63,34 @@ export default {
     actions: {
         async saveConfig({ commit }, config) {
             try {
-                // Simula una richiesta API per salvare la configurazione
-                await apiService.saveConfig(config);
-                commit('SET_CONFIG', config);
-                commit('SET_ALERT_MESSAGE', 'Configuration saved successfully');
+                // Validazione dei dati prima dell'invio
+                const validConfig = {
+                    ...config,
+                    mqtt_host: String(config.mqtt_host || 'localhost'),
+                    mqtt_port: Number(config.mqtt_port || 1883),
+                    opcua_server_url: String(config.opcua_server_url || 'opc.tcp://localhost:4840/freeopcua/server/')
+                };
+
+                // Verifica che i valori siano validi
+                if (!validConfig.mqtt_host || !validConfig.mqtt_port) {
+                    throw new Error('MQTT host and port are required');
+                }
+
+                // Invia la configurazione validata
+                const response = await apiService.saveConfig(validConfig);
+
+                if (response.success) {
+                    commit('SET_CONFIG', validConfig);
+                    commit('SET_ALERT_MESSAGE', 'Configuration saved successfully');
+                } else {
+                    throw new Error(response.error || 'Failed to save configuration');
+                }
             } catch (error) {
-                commit('SET_ERROR', 'Failed to save configuration');
+                commit('SET_ERROR', `Failed to save configuration: ${error.message}`);
                 throw error;
             }
         },
+        
         setAlert({ commit }, alertMessage) {
             commit('SET_ALERT_MESSAGE', alertMessage);
         },
