@@ -45,14 +45,16 @@ class APIService {
 
     async executeCommand(command, params = {}) {
         try {
-            const response = await this.axios.post('/command', {
-                command,
-                params
-            });
-            return response.data;
+            const message = {
+                command: command.toLowerCase(),
+                params: params
+            };
+
+            await this.mqtt_client.publish('command', message);
+            return true;
         } catch (error) {
             console.error('Error executing command:', error);
-            throw error;
+            return false;
         }
     }
 
